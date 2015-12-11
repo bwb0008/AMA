@@ -1,0 +1,96 @@
+#   /////////////////////////////////////////////////////////////////////////
+#   //   _______________________________________________________________   //
+#   //  |_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|  //
+#   //  ||_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_||  //
+#   //  |_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|  //
+#   //  ||_|_|_|_|_|_|_|_||                           ||_|_|_|_|_|_|_|_||  //
+#   //  |_|_|_|_|_|_|_|_|_| Generate_Bsolve_Import.rb |_|_|_|_|_|_|_|_|_|  //
+#   //  ||_|_|_|_|_|_|_|_||   <| Brandon W. Banks |>  ||_|_|_|_|_|_|_|_||  //
+#   //  |_|_|_|_|_|_|_|_|_|          [ Ruby ]         |_|_|_|_|_|_|_|_|_|  //
+#   //  ||_|_|_|_|_|_|_|_||      November 20, 2015    ||_|_|_|_|_|_|_|_||  //
+#   //  |_|_|_|_|_|_|_|_|_|---------------------------|_|_|_|_|_|_|_|_|_|  //
+#   //  ||_|_|_|_|_||          Project Description:         ||_|_|_|_|_||  //
+#   //  |_|_|_|_|_|_|                                       |_|_|_|_|_|_|  //
+#   //  ||_|_|_|_|_||  Using Ruby to parse through a text   ||_|_|_|_|_||  //
+#   //  |_|_|_|_|_|_|   file to retrieve the X, Y, and Z    |_|_|_|_|_|_|  //
+#   //  ||_|_|_|_|_||  corrdinates for the ballasts for use ||_|_|_|_|_||  //
+#   //  |_|_|_|_|_|_|       in the Bsolve Excel sheet.      |_|_|_|_|_|_|  //
+#   //  ||_|_|_|_|_||  In coordination with Dennis Bulgatz  ||_|_|_|_|_||  //
+#   //  |_|_|_|_|_|_|_______________________________________|_|_|_|_|_|_|  //
+#   //  ||_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_||  //
+#   //  |_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|  //
+#   //  ||_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_||  //
+#   //                                                                     //
+#   /////////////////////////////////////////////////////////////////////////
+
+filename = "C:/Users/Brandon W. Banks/Downloads/sample_massprops.txt"
+require 'CSV'
+
+found_P1 = false      # Found section for Part Number           [1250563-1]
+found_P1_info = false # Found X-Y-Z coordinates for Part Number [1250563-1]
+found_P2_info = false # Found X-Y-Z coordinates for Part Number [1250151-1]
+
+# Reference - [ http://rubular.com/ ]
+# Sample String:
+# "         2.83000e-01  4.82745e+01  7.10553e+02  3.95000e+01  3.00000e+00"
+reg = Regexp.new('\s+([ -]\d{1}\.\d{5}e[+-]\d{2})\s+'+
+                    '([ -]\d{1}\.\d{5}e[+-]\d{2})\s+'+
+                    '([ -]\d{1}\.\d{5}e[+-]\d{2})\s+'+
+                    '([ -]\d{1}\.\d{5}e[+-]\d{2})\s+'+
+                    '([ -]\d{1}\.\d{5}e[+-]\d{2})')
+
+# Holds X-Y-Z coordinates for importing to Excel
+Part1 = [] # Part Number [1250563-1]
+Part2 = [] # Part Number [1250151-1]
+
+# Loop until end of file
+# look for Part Numbers: 1250563-1 and 1250151-1
+File.open(filename).each do |line|
+    line.chomp!
+    next unless line
+
+    # Look for Part 1's section
+     # If found, skip down to Part 1's X-Y-Z coordinates
+      # If found then save to Part1
+    found_P1 = true if line == 'MASS PROPERTIES OF THE PART 1250563-1'
+
+    if found_P1 && line =~ /^CENTER OF GRAVITY with respect to FTA_STRUCTURAL_FRAME coordinate frame:/
+        found_P1_info = true
+        next
+    end
+
+    if found_P1_info
+        Part1 << line.split(/\s+/) #split on whitespaces
+        found_P1 = false 
+        found_P1_info = false
+    end   
+
+    #Look for Part 2's information
+     #If found then save to Part2 
+    found_P2_info = true if line =~ /^\s+1250151-1\s+MATERIAL:\s+UNKNOWN/
+    
+    if found_P2_info && reg.match(line)
+         Part2 << reg.match(line)[1..5]
+         found_P2_info = false
+         next
+    end 
+
+end
+
+
+filename_out = "C:/Temp/output_" + Time.now.strftime('%m-%e-%y-%H%M%S') + ".csv"
+CSV.open(filename_out,"w") do |row|
+    row << ["X","Y","Z", "Part Number"]
+
+    # Output Part 1
+    Part1.each do |a|
+        row << a[3..5] + ["1250563-1"] 
+    end
+
+    # Output Part 2
+    Part2.each do |b|
+        row << b[2..4] + ["1250151-1"]
+    end
+
+end
+
